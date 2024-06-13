@@ -84,25 +84,15 @@ void SysClkConf_72MHz(void) {
 }
 
 //ham delay
-void delayUs(uint32_t us){
-		uint32_t i;
-		for(i=0;i<us;i++){
-			SysTick->LOAD = 9-1;
-			SysTick->VAL = 0;
-			SysTick->CTRL |= SysTick_CTRL_ENABLE;
-			while(!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG));
-			SysTick->CTRL &= ~SysTick_CTRL_ENABLE;
-	}
-}
 void delayMs(uint32_t ms){
-		uint32_t i;
-		for(i=0;i<ms;i++){
-			SysTick->LOAD = 9000-1;
-			SysTick->VAL = 0;
-			SysTick->CTRL |= SysTick_CTRL_ENABLE;
-			while(!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG));
-			SysTick->CTRL &= ~SysTick_CTRL_ENABLE;
-	}
+	uint32_t i;
+	for(i=0;i<ms;i++){
+	SysTick->LOAD = 9000-1;
+	SysTick->VAL = 0;
+	SysTick->CTRL |= SysTick_CTRL_ENABLE;
+	while(!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG));
+	SysTick->CTRL &= ~SysTick_CTRL_ENABLE;
+    }
 }
 //ham vao che do ngu
 void enter_sleep_mode(void) {
@@ -282,60 +272,86 @@ void LCD_Write(uint8_t address, uint8_t *data, int size){
     I2C1->CR1 |= I2C_CR1_STOP;
 }
 
-void lcd_send_cmd(char cmd){
-    char data_u = cmd & 0xF0;
-    char data_l = (cmd << 4) & 0xF0;
-    uint8_t data_t[4] = {
-        data_u | 0x0C, data_u | 0x08, //0x0C Rs = 0 E = 1, 0x08 Rs = 0 E = 0
-        data_l | 0x0C, data_l | 0x08
-    };
-    LCD_Write(LCD_ADDR, data_t, 4);
+void lcd_send_cmd (char cmd)
+{
+  char data_u, data_l;
+	uint8_t data_t[4];
+	data_u = (cmd&0xf0);
+	data_l = ((cmd<<4)&0xf0);
+	data_t[0] = data_u|0x0C;  //en=1, rs=0
+	data_t[1] = data_u|0x08;  //en=0, rs=0
+	data_t[2] = data_l|0x0C;  //en=1, rs=0
+	data_t[3] = data_l|0x08;  //en=0, rs=0
+	HAL_I2C_Master_Transmit (&hi2c1, 0x4E,(uint8_t *) data_t, 4, 100);
 }
-void lcd_send_data(char data){
-    char data_u = data & 0xF0;
-    char data_l = (data << 4) & 0xF0;
-    uint8_t data_t[4] = {
-        data_u | 0x0D, data_u | 0x09,//0x0D Rs = 1 E = 1, 0x09 Rs = 1 E = 0
-        data_l | 0x0D, data_l | 0x09
-    };
-    LCD_Write(LCD_ADDR, data_t, 4);
-}
-void lcd_send_string(char *str){
-    while (*str){
-			lcd_send_data(*str++);
-		}
-}
-// Hàm kh?i t?o LCD
-void lcd_init(void) {
-		delayMs(50);
-    lcd_send_cmd(0x30);//bat nguon
-    delayMs(5);
-    lcd_send_cmd(0x30);
-    delayUs(150);
-    lcd_send_cmd(0x30);
-    delayMs(10);
-	
-    lcd_send_cmd(0x20);//doi sang 4 bit	
 
-    lcd_send_cmd(0x28);//2 line, 5x8 font
-    delayMs(1);
-    lcd_send_cmd(0x08);//tat hien thi, xoa cursor, tat blink
-    delayMs(1);
-    lcd_send_cmd(0x01);//clear man
-    delayMs(1);
-    lcd_send_cmd(0x06);//cursor tang dan
-    delayMs(1);
-    lcd_send_cmd(0x0C);//bat hien thi
+void lcd_send_data (char data)
+{
+	char data_u, data_l;
+	uint8_t data_t[4];
+	data_u = (data&0xf0);
+	data_l = ((data<<4)&0xf0);
+	data_t[0] = data_u|0x0D;  //en=1, rs=0
+	data_t[1] = data_u|0x09;  //en=0, rs=0
+	data_t[2] = data_l|0x0D;  //en=1, rs=0
+	data_t[3] = data_l|0x09;  //en=0, rs=0
+	HAL_I2C_Master_Transmit (&hi2c1, SLAVE_ADDRESS_LCD,(uint8_t *) data_t, 4, 100);
+}
+void lcd_send_string (char *str)
+{
+	while (*str) lcd_send_data (*str++);
+}
+
+// Hàm khoi tao LCD
+void lcd_init (void)
+{
+	// 4 bit initialisation
+	DelayMs(50);  // wait for >40ms
+	lcd_send_cmd (0x30);
+	DelayMs(5);  // wait for >4.1ms
+	lcd_send_cmd (0x30);
+	DelayMs(1);  // wait for >100us
+	lcd_send_cmd (0x30);
+	DelayMs(10);
+	lcd_send_cmd (0x20);  // 4bit mode
+	DelayMs(10);
+
+  // dislay initialisation
+	lcd_send_cmd (0x28); // Function set --> DL=0 (4 bit mode), N = 1 (2 line display) F = 0 (5x8 characters)
+	DelayMs(1);
+	lcd_send_cmd (0x08); //Display on/off control --> D=0,C=0, B=0  ---> display off
+	DelayMs(1);
+	lcd_send_cmd (0x01);  // clear display
+	DelayMs(1);
+	DelayMs(1);
+	lcd_send_cmd (0x06); //Entry mode set --> I/D = 1 (increment cursor) & S = 0 (no shift)
+	DelayMs(1);
+	lcd_send_cmd (0x0C); //Display on/off control --> D = 1, C and B = 0. (Cursor and blink, last two bits)
 }
 // Ham thiet lap vi tri con tro
-void lcd_set_cursor(uint8_t row, uint8_t col) {
-		uint8_t addr = (row == 0) ? 0x80 + col : 0xC0 + col;
-    lcd_send_cmd(addr);
+void set_lcd(int row, int col)
+{
+    switch (row)
+    {
+        case 0:
+            col |= 0x80;
+            break;
+        case 1:
+            col |= 0xC0;
+            break;
+    }
+
+    lcd_send_cmd (col);
 }
 
-void lcd_clear(void) {
-    lcd_send_cmd(0x01);  // xoa man hinh
-    delayMs(2);  // doi lenh thuc hien
+
+void lcd_clear (void)
+{
+	lcd_send_cmd (0x80);
+	for (int i=0; i<70; i++)
+	{
+		lcd_send_data (' ');
+	}
 }
 
 void EXTI_Config(void) {
