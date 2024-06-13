@@ -25,8 +25,6 @@ int16_t Accel_Y_RAW;
 int16_t Accel_Z_RAW;
 volatile float Ax,Ay,Az;
 
-
-
 volatile float Limit = 2.5; // GIA TRI DAT PHAT HIEN NGA
 
 //bien trang thai cua he thong
@@ -48,66 +46,6 @@ void set_lcd(int row, int col);
 void lcd_clear(void);
 void EXIT_Config(void);
 void delayMs(uint32_t ms);
-
-//ham cau hinh xung he thong
-void SysClkConf_72MHz(void) {
-    //su dung hse
-    RCC->CR |= RCC_CR_HSEON;
-    while((RCC->CR & RCC_CR_HSERDY) == 0); // doi san sang
-
-    //cau hinh PLL 
-    RCC->CFGR |= RCC_CFGR_PLLMULL9; // *9 = systemclock = 72MHz
-    RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6; // ADC prescale 6.
-    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2; //APB1 prescale 2.
-
-    //chon nguon hse cho pll
-    RCC->CFGR |= RCC_CFGR_PLLSRC; // PLLSRC HSE
-
-    //bat pll
-    RCC->CR |= RCC_CR_PLLON;
-    while((RCC->CR & RCC_CR_PLLRDY) == 0); // wait PLLRDY.
-
-    //doi sysclock sang pll
-    RCC->CFGR |= RCC_CFGR_SW_PLL;
-    while((RCC->CFGR & RCC_CFGR_SWS) == 0); //wait SWS.
-
-    //tat hsi
-    RCC->CR &= ~(RCC_CR_HSION); // off HSION
-    while((RCC->CR & RCC_CR_HSIRDY) == RCC_CR_HSIRDY);
-}
-
-//ham delay
-void delayMs(uint32_t ms){
-	uint32_t i;
-	for(i=0;i<ms;i++){
-	SysTick->LOAD = 9000-1;
-	SysTick->VAL = 0;
-	SysTick->CTRL |= SysTick_CTRL_ENABLE;
-	while(!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG));
-	SysTick->CTRL &= ~SysTick_CTRL_ENABLE;
-    }
-}
-//ham vao che do ngu
-void enter_sleep_mode(void) {
-    // cap xung cho pwr
-    RCC->APB1ENR |= RCC_APB1ENR_PWREN;
-
-    // xoa co pdds de vao Stop mode 
-    PWR->CR &= ~PWR_CR_PDDS;
-
-    // dat lpds de vao che do low-power deepsleep
-    PWR->CR |= PWR_CR_LPDS;
-
-    // dat che do sleepdeep
-    SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
-
-    // xoa WFI/WFE de chuan bi ngu dung cac ham de hoan thanh cac lenh truoc
-    __DSB();
-    __ISB();
-
-    // vao che do ngu
-    __WFI();
-}
 
 //ham tinh toan do lon gia toc theo 3 phuong
 float AccelValue(float ax, float ay, float az);{
@@ -291,6 +229,45 @@ void lcd_clear (void)
 	{
 		lcd_send_data (' ');
 	}
+}
+
+//ham cau hinh xung he thong
+void SysClkConf_72MHz(void) {
+    //su dung hse
+    RCC->CR |= RCC_CR_HSEON;
+    while((RCC->CR & RCC_CR_HSERDY) == 0); // doi san sang
+
+    //cau hinh PLL 
+    RCC->CFGR |= RCC_CFGR_PLLMULL9; // *9 = systemclock = 72MHz
+    RCC->CFGR |= RCC_CFGR_ADCPRE_DIV6; // ADC prescale 6.
+    RCC->CFGR |= RCC_CFGR_PPRE1_DIV2; //APB1 prescale 2.
+
+    //chon nguon hse cho pll
+    RCC->CFGR |= RCC_CFGR_PLLSRC; // PLLSRC HSE
+
+    //bat pll
+    RCC->CR |= RCC_CR_PLLON;
+    while((RCC->CR & RCC_CR_PLLRDY) == 0); // wait PLLRDY.
+
+    //doi sysclock sang pll
+    RCC->CFGR |= RCC_CFGR_SW_PLL;
+    while((RCC->CFGR & RCC_CFGR_SWS) == 0); //wait SWS.
+
+    //tat hsi
+    RCC->CR &= ~(RCC_CR_HSION); // off HSION
+    while((RCC->CR & RCC_CR_HSIRDY) == RCC_CR_HSIRDY);
+}
+
+//ham delay
+void delayMs(uint32_t ms){
+	uint32_t i;
+	for(i=0;i<ms;i++){
+	SysTick->LOAD = 9000-1;
+	SysTick->VAL = 0;
+	SysTick->CTRL |= SysTick_CTRL_ENABLE;
+	while(!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG));
+	SysTick->CTRL &= ~SysTick_CTRL_ENABLE;
+    }
 }
 
 void EXTI_Config(void) {
