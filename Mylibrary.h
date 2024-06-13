@@ -19,29 +19,24 @@
 #define WHO_AM_I_REG 0X75
 
 extern volatile float Ax, Ay, Az;
-extern volatile float LimitValue;
-extern volatile uint8_t system_on;
+extern volatile float Limit;
+extern volatile uint8_t status;
 
-// Function prototypes
-void SysClkConf_72MHz(void);
-void enter_sleep_mode(void);
-float AccelValue(float Ax, float Ay, float Az)
+// Khai bao ham
+float AccelValue(float ax, float ay, float az);
 void I2C_Init(void);
-void MPU_WriteReg(uint8_t reg, uint8_t data);
-uint8_t MPU_ReadReg(uint8_t reg);
 void MPU6050_Init(void);
-void MPU6050_Read_Accel(void);
 void LED_Init(void);
-void I2C_Write(uint8_t data);
-void LCD_Write(uint8_t address, uint8_t *data, int size);
+void I2C_Write(uint16_t devAddress, uint8_t regAddress, uint8_t *data, uint16_t size);
+void I2C_Read(uint16_t devAddress, uint8_t regAddress, uint8_t *data, uint16_t size);
 void lcd_send_cmd(char cmd);
 void lcd_send_data(char data);
 void lcd_send_string(char *str);
 void lcd_init(void);
-void lcd_set_cursor(uint8_t row, uint8_t col);
+void set_lcd(int row, int col);
 void lcd_clear(void);
+void SysClkConf_72MHz(void);
 void EXIT_Config(void);
-void delayUs(uint32_t us);
 void delayMs(uint32_t ms);
 
 #endif // MYLIBRARY_H
