@@ -28,10 +28,9 @@ volatile float Ax,Ay,Az;
 volatile float Limit = 2.5; // GIA TRI DAT PHAT HIEN NGA
 
 //bien trang thai cua he thong
-volatile uint8_t system_on = 1;
+volatile uint8_t status = 1;
 
 //khai bao ham
-void SysClkConf_72MHz(void);
 float AccelValue(float ax, float ay, float az);
 void I2C_Init(void);
 void MPU6050_Init(void);
@@ -44,6 +43,7 @@ void lcd_send_string(char *str);
 void lcd_init(void);
 void set_lcd(int row, int col);
 void lcd_clear(void);
+void SysClkConf_72MHz(void);
 void EXIT_Config(void);
 void delayMs(uint32_t ms);
 
@@ -313,7 +313,7 @@ void EXTI_Config(void) {
 void EXTI1_IRQHandler(void) {
     if (EXTI->PR & EXTI_PR_PR1) {
         EXTI->PR |= EXTI_PR_PR1;
-        system_on = !system_on; // dao nguoc che do
+        status = !status; // dao nguoc che do
     }
 }
 void lcd_Writedata(int a){
@@ -334,7 +334,7 @@ void EXTI0_IRQHandler(void) {
 		
     if (EXTI->PR & EXTI_PR_PR0) {
         EXTI->PR |= EXTI_PR_PR0;
-        if (system_on) {
+        if (status) {
             MPU6050_ReadAccel(&a_x, &a_y, &a_z);
             if (checkFall(a_x, a_y, a_z, Limit)) {						
 		lcd_Writedata(1);
