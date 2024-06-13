@@ -33,27 +33,20 @@ volatile float Limit = 2.5; // GIA TRI DAT PHAT HIEN NGA
 volatile uint8_t system_on = 1;
 
 //khai bao ham
-void SysClkConf_72MHz(void) ;
-void enter_sleep_mode(void);
-float calculateAccelMagnitude(float ax, float ay, float az);
-int checkFall(float ax, float ay, float az, float Limit);
+void SysClkConf_72MHz(void);
+float AccelValue(float ax, float ay, float az);
 void I2C_Init(void);
-void MPU_WriteReg(uint8_t reg, uint8_t data);
-uint8_t MPU_ReadReg(uint8_t reg);
 void MPU6050_Init(void);
-void MPU6050_ReadAccelRaw(int16_t* ax, int16_t* ay, int16_t* az);
 void LED_Init(void);
-void MPU6050_ReadAccel(float* ax, float* ay, float* az);
-void I2C_Write(uint8_t data);
-void LCD_Write(uint8_t address, uint8_t *data, int size);
+void I2C_Write(uint16_t devAddress, uint8_t regAddress, uint8_t *data, uint16_t size);
+void I2C_Read(uint16_t devAddress, uint8_t regAddress, uint8_t *data, uint16_t size);
 void lcd_send_cmd(char cmd);
 void lcd_send_data(char data);
 void lcd_send_string(char *str);
 void lcd_init(void);
-void lcd_set_cursor(uint8_t row, uint8_t col);
+void set_lcd(int row, int col);
 void lcd_clear(void);
-void EXTI_Config(void);
-void delayUs(uint32_t us);
+void EXIT_Config(void);
 void delayMs(uint32_t ms);
 
 //ham cau hinh xung he thong
@@ -117,14 +110,8 @@ void enter_sleep_mode(void) {
 }
 
 //ham tinh toan do lon gia toc theo 3 phuong
-float calculateAccelMagnitude(float ax, float ay, float az) {
+float AccelValue(float ax, float ay, float az);{
     return sqrt(ax * ax + ay * ay + az * az);
-}
-
-//ham kiem tra nga
-int checkFall(float ax, float ay, float az, float Limit) {
-    float accelMag = calculateAccelMagnitude(ax, ay, az);
-    return (accelMag > Limit) ? 1 : 0;
 }
 
 //cau hinh i2c
@@ -153,62 +140,14 @@ void I2C_Init(void) {
     I2C1->CR1 |= I2C_CR1_PE;
 }
 
-//ham ghi vao thanh ghi qua i2c
-void MPU_WriteReg(uint8_t reg, uint8_t data) {
-    // khoi dong i2c
-    I2C1->CR1 |= I2C_CR1_START;
-    while (!(I2C1->SR1 & I2C_SR1_SB)); // doi den khi i2c duoc khoi dong
-
-    // gui dia chi muc tieu(mpu6050) 
-    I2C1->DR = MPU6050_ADDR;
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
-    (void)I2C1->SR2;
-
-    // gui dia chi cua thanh ghi muon ghi 
-    I2C1->DR = reg;
-    while (!(I2C1->SR1 & I2C_SR1_TXE));
-
-    // ghi du lieu vao thanh ghi reg
-    while (!(I2C1->SR1 & I2C_SR1_TXE));
-    I2C1->DR = data; // Send data
-    while (!(I2C1->SR1 & I2C_SR1_BTF));
-
-    // ket thuc i2c
-    I2C1->CR1 |= I2C_CR1_STOP;
+void I2C_Write(uint16_t devAddress, uint8_t regAddress, uint8_t *data, uint16_t size) {
+    HAL_I2C_Master_Transmit(&hi2c1, devAddress, &regAddress, 1, HAL_MAX_DELAY);
+    HAL_I2C_Master_Transmit(&hi2c1, devAddress, data, size, HAL_MAX_DELAY);
 }
 
-//ham doc tu thanh ghi qua i2c
-uint8_t MPU_ReadReg(uint8_t reg) {
-    uint8_t data;
-    // bat dau i2c
-    I2C1->CR1 |= I2C_CR1_START;
-    while (!(I2C1->SR1 & I2C_SR1_SB));
-
-    // gui dia chi cua mpu6050
-    I2C1->DR = MPU6050_ADDR;
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
-    (void)I2C1->SR2;
-
-    // gui dia chi thanh ghi muon doc
-    I2C1->DR = reg;
-    while (!(I2C1->SR1 & I2C_SR1_TXE));
-
-    // khoi dong lai i2c de chuan bi cho viec doc
-    I2C1->CR1 |= I2C_CR1_START;
-    while (!(I2C1->SR1 & I2C_SR1_SB));
-
-    // doc du lieu dia chi MPU6050_ADDR va set bit lsb = 1 de cho biet la muon nhan du lieu
-    I2C1->DR = MPU6050_ADDR | 0x01;
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
-    (void)I2C1->SR2; // xoa thanh ghi sr1, sr2 sau khi ghi hoac doc
-
-    // xoa ack va gui tin hieu stop roi doc du lieu
-    I2C1->CR1 &= ~I2C_CR1_ACK;
-    I2C1->CR1 |= I2C_CR1_STOP;
-    while (!(I2C1->SR1 & I2C_SR1_RXNE)); // cho tin hieu interrupt
-    data = I2C1->DR;
-
-    return data;
+void I2C_Read(uint16_t devAddress, uint8_t regAddress, uint8_t *data, uint16_t size) {
+    HAL_I2C_Master_Transmit(&hi2c1, devAddress, &regAddress, 1, HAL_MAX_DELAY);
+    HAL_I2C_Master_Receive(&hi2c1, devAddress, data, size, HAL_MAX_DELAY);
 }
 
 //ham cau hinh mpu
@@ -216,24 +155,24 @@ void MPU6050_Init(void) {
   uint8_t check, Data;
 
   // Đoc thanh ghi WHO_AM_I đe kiem tra thiet bi MPU6050
-  HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR, WHO_AM_I_REG, 1, &check, 1, 1000);
+  I2C_Read(&hi2c1, MPU6050_ADDR, WHO_AM_I_REG, 1, &check, 1, 1000);
   if (check == 0x68)  // Kiểm tra mã ID của thiết bị MPU6050
   {
     // Đua thiet bi MPU6050 ra khoi che đo quan ly nang luc bang cach đat thanh ghi quan la 0
     Data = 0;
-    HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDR, PWR_MGMT_1_REG, 1, &Data, 1, 1000);
+    I2C_Write(&hi2c1, MPU6050_ADDR, PWR_MGMT_1_REG, 1, &Data, 1, 1000);
 
     // Cau hinh ty le du lieu 1kHz bang cach cai cau hinh thanh ghi SMPLRT_DIV
     Data = 0x07;
-    HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDR, SMPLRT_DIV_REG, 1, &Data, 1, 1000);
+    I2C_Write(&hi2c1, MPU6050_ADDR, SMPLRT_DIV_REG, 1, &Data, 1, 1000);
 
     // Cai cau hinh gia toc đo lên đo nhay ±2g trong thanh ghi ACCEL_CONFIG
     Data = 0x00;
-    HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDR, ACCEL_CONFIG_REG, 1, &Data, 1, 1000);
+    I2C_Write(&hi2c1, MPU6050_ADDR, ACCEL_CONFIG_REG, 1, &Data, 1, 1000);
 
     // Cai cau hinh tron xoay lên độ nhay ±250°/s trong thanh ghi GYRO_CONFIG
     Data = 0x00;
-    HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDR, GYRO_CONFIG_REG, 1, &Data, 1, 1000);
+    I2C_Write(&hi2c1, MPU6050_ADDR, GYRO_CONFIG_REG, 1, &Data, 1, 1000);
   }
 }
 
@@ -241,7 +180,7 @@ void MPU6050_Init(void) {
 void MPU6050_Read_Accel(void) {
   uint8_t Rec_Data[6];
   // Doc 6 BYTES data tu ACCEL_XOUT_H register
-  HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR, ACCEL_XOUT_H_REG, 1, Rec_Data, 6, 1000);
+  I2C_Read(&hi2c1, MPU6050_ADDR, ACCEL_XOUT_H_REG, 1, Rec_Data, 6, 1000);
   Accel_X_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data[1]);
   Accel_Y_RAW = (int16_t)(Rec_Data[2] << 8 | Rec_Data[3]);
   Accel_Z_RAW = (int16_t)(Rec_Data[4] << 8 | Rec_Data[5]);
