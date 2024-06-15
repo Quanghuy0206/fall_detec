@@ -7,7 +7,7 @@ int main(void) {
     LED_Init();
     Switch_Init();
     lcd_init();
-    set_lcd(0, 4);
+    set_lcd(0, 0);
     lcd_send_string("0");
     delayMs(50);
     while (1) {
